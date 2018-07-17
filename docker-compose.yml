@@ -2,9 +2,7 @@ version: '2.1'
 services:
 
     mailman-core:
-      image: maxking/mailman-core:latest
-      domainname: ${DOMAINNAME}
-      hostname: ${HOSTNAME}
+      build: ./data/Dockerfiles/mm-core
       depends_on:
         - database
       environment:
@@ -13,6 +11,8 @@ services:
         - DATABASE_TYPE=mysql
         - DATABASE_CLASS=mailman.database.mysql.MySQLDatabase
         - HYPERKITTY_API_KEY=${HKAPIKEY}
+        - SMTP_HOST=postfix
+        - SMTP_PORT=${SMTP_PORT:-25}
       volumes:
         - mailman-core-vol-1:/opt/mailman/
       restart: always
@@ -22,14 +22,12 @@ services:
         - ${IPV4_NETWORK:-172.19.199}.254
       networks:
         mailcow-network:
-          ipv4_address: ${IPV4_NETWORK:-172.19.199}.2
+          ipv4_address: ${IPV4_NETWORK:-172.19.199}.253
           aliases:
             - mailman-core
 
     mailman-web:
-      image: maxking/mailman-web:latest
-      domainname: ${DOMAINNAME}
-      hostname: ${HOSTNAME}
+      build: ./data/Dockerfiles/mm-web
       depends_on:
         - database
         - mailman-core
@@ -42,6 +40,9 @@ services:
         - DYLD_LIBRARY_PATH=/usr/local/mysql/lib/
         - SERVE_FROM_DOMAIN=lists.${DOMAINNAME}
         - UWSGI_STATIC_MAP=/static=/opt/mailman-web-data/static
+        - IPV4_NETWORK=${IPV4_NETWORK:-172.19.199}
+        - SMTP_HOST=postfix
+        - SMTP_PORT=${SMTP_PORT:-25}
       volumes:
         - ./data/mailman/web:/opt/mailman-web-data
       restart: always
@@ -51,7 +52,6 @@ services:
         - ${IPV4_NETWORK:-172.19.199}.254
       networks:
         mailcow-network:
-          ipv4_address: ${IPV4_NETWORK:-172.19.199}.3
           aliases:
             - mailman-web
 
@@ -73,7 +73,6 @@ services:
         - ${IPV4_NETWORK:-172.19.199}.254
       networks:
         mailcow-network:
-          ipv4_address: ${IPV4_NETWORK:-172.19.199}.4
           aliases:
             - database
 
@@ -96,8 +95,6 @@ services:
 
     mysql-mailcow:
       image: mariadb:10.2
-      depends_on:
-        - mailman-web
       volumes:
         - mysql-vol-1:/var/lib/mysql/
         - ./data/conf/mysql/:/etc/mysql/conf.d/:ro
@@ -121,8 +118,6 @@ services:
 
     redis-mailcow:
       image: redis:4-alpine
-      depends_on:
-        - mailman-web
       volumes:
         - redis-vol-1:/data/
       restart: always
@@ -141,8 +136,6 @@ services:
     clamd-mailcow:
       image: mailcow/clamd:1.12
       build: ./data/Dockerfiles/clamd
-      depends_on:
-        - mailman-web
       restart: always
       tty: true
       environment:
@@ -298,8 +291,6 @@ services:
     postfix-mailcow:
       image: mailcow/postfix:1.16
       build: ./data/Dockerfiles/postfix
-      depends_on:
-        - mailman-web
       volumes:
         - ./data/conf/postfix:/opt/postfix/conf
         - ./data/assets/ssl:/etc/ssl/mail/:ro
@@ -332,7 +323,6 @@ services:
     memcached-mailcow:
       image: memcached:alpine
       depends_on:
-        - mailman-web
       restart: always
       sysctls:
         - net.ipv6.conf.all.disable_ipv6=${SYSCTL_IPV6_DISABLED:-0}
@@ -445,8 +435,6 @@ services:
       # Debug
       #command: /watchdog.sh
       build: ./data/Dockerfiles/watchdog
-      depends_on:
-        - mailman-web
       sysctls:
         - net.ipv6.conf.all.disable_ipv6=${SYSCTL_IPV6_DISABLED:-0}
       volumes:
@@ -473,8 +461,6 @@ services:
       image: mailcow/dockerapi:1.13
       restart: always
       build: ./data/Dockerfiles/dockerapi
-      depends_on:
-        - mailman-web
       sysctls:
         - net.ipv6.conf.all.disable_ipv6=${SYSCTL_IPV6_DISABLED:-0}
       oom_score_adj: -10
@@ -490,8 +476,6 @@ services:
 
     ipv6nat:
       image: robbertkl/ipv6nat
-      depends_on:
-        - mailman-web
       restart: always
       privileged: true
       network_mode: "host"
