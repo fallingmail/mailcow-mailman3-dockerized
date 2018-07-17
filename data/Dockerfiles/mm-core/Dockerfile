@@ -11,7 +11,7 @@ RUN apk update \
     && apk add bash su-exec postgresql-client mysql-client curl \
     && pip install psycopg2 \
                    mailman==3.2.0 \
-                   mailman-hyperkitty==1.2.0 \
+                   mailman-hyperkitty==1.1.0 \
                    pymysql \
     && apk del build-deps \
     && adduser -S mailman
